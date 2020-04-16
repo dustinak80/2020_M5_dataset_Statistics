@@ -1,0 +1,105 @@
+---
+title: "M5 Forecasting - Multivariate Analysis"
+author: "Dustin Vasquez"
+date: "4/14/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# GENERAL DATA MANIPULATION
+library('dplyr') # data manipulation
+library('readr') # input/output
+# install.packages("vroom")
+library('vroom') # input/output
+# install.packages("skimr")
+library('skimr') # overview
+library('tibble') # data wrangling
+library('tidyr') # data wrangling
+library('purrr') # data wrangling
+library('stringr') # string manipulation
+library('forcats') # factor manipulation
+
+```
+
+### Import the Data
+```{r}
+setwd("C:/Users/Dustin/Desktop/Masters Program/Spring Semester/aa Applied Stats and Multivariate Analysis/Project/Data")
+
+#Import data
+train = vroom('sales_train_validation.csv', delim = ",", col_types = cols())
+prices = vroom('sell_prices.csv', delim = ",", col_types = cols())
+calendar = read_csv('calendar.csv', col_types = cols())
+```
+
+### Look at the Data
+#### Train Data
+The columns of the train data are as follows:
+```{r, echo=FALSE}
+c(names(train[,1:8]),'....',names(train[,1915:1919]))
+```
+
+Here is a look at the first 5 rows of the first 7 and last 4 columns
+```{r, echo=FALSE}
+cbind(train[1:5,1:7], train[1:5,1915:1919])
+```
+
+#### Prices Data
+The columns of the Price Data is as follows:
+```{r, echo = FALSE}
+names(prices)
+```
+Here is a look at the first 5 and last 5 rows of the data set
+```{r, echo=FALSE}
+rbind(head(prices),tail(prices))
+```
+This data set gives you the store id and item id which is equal to the values in the data set. The wm_yr_wk that is used in the calendar data represents the year that the week count was started and the sequence of weeks in that year. Since this data sets first values start on 1/29/13 the first wm_yr_wk is 11301, then in one year, 1/22/14 you will reach 11352. From there it goes to 11401 and follows on until there is no more data. This will be better displayed in the following dataset. 
+
+#### Calendar Data
+The columns in the calendar data are as follows:
+```{r, echo=FALSE}
+names(calendar)
+```
+
+Here is the first 5 rows and last 5 rows of the data set:
+```{r, echo=FALSE}
+rbind(head(calendar),tail(calendar))
+```
+Lookint at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
+
+This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an even and what that event type is. It also gives you information on whether that day is a Snap day or not in either of the three states.
+
+To display the structure of the wm_yr_wk, lets look at the follwing code:
+```{r, echo=FALSE}
+ind = c(calendar['wm_yr_wk']<=11201)
+#c(min(calendar[ind, 'wm_yr_wk']), max(calendar[ind, 'wm_yr_wk']))
+
+# wm_yr_wk = 1_yr starts_week of relative year
+rbind(
+cbind(head(calendar[ind, 'date'], n = 8), head(calendar[ind, 'wm_yr_wk'], n= 8)),
+cbind(tail(calendar[ind, 'date'], n = 15), tail(calendar[ind, 'wm_yr_wk'], n = 15))
+)
+```
+By looking at this first year of values, you can see how this supports what was stated earlier about the wm_yr_wk values.
+
+```{r, echo=False} 
+ind = c(calendar['wm_yr_wk']>=11600)
+last_wk = max(calendar[ind, 'wm_yr_wk'])
+```
+We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `last_wk` which tells there is 21 weeks by looking at the last values.
+```{r, echo=False}
+rbind(
+cbind(head(calendar[ind, 'date'], n = 7), head(calendar[ind, 'wm_yr_wk'], n= 7)),
+cbind(tail(calendar[ind, 'date'], n = 10), tail(calendar[ind, 'wm_yr_wk'], n = 10))
+)
+```
+I find it interesting that there should be 24 weeks January 30th, 2016 and July 19th, 2016.
+
+### Combine and Format the Data
+
+
+### Exploratory Analysis
+
+
+

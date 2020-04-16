@@ -21,6 +21,9 @@ library('purrr') # data wrangling
 library('stringr') # string manipulation
 library('forcats') # factor manipulation
 
+#PLOTTING
+library(ggplot2)
+
 ```
 
 ### Import the Data
@@ -83,12 +86,12 @@ cbind(tail(calendar[ind, 'date'], n = 15), tail(calendar[ind, 'wm_yr_wk'], n = 1
 ```
 By looking at this first year of values, you can see how this supports what was stated earlier about the wm_yr_wk values.
 
-```{r, echo=False} 
+```{r, echo=FALSE} 
 ind = c(calendar['wm_yr_wk']>=11600)
 last_wk = max(calendar[ind, 'wm_yr_wk'])
 ```
-We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `last_wk` which tells there is 21 weeks by looking at the last values.
-```{r, echo=False}
+We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `r last_wk` which tells there is 21 weeks by looking at the last values.
+```{r, echo=FALSE}
 rbind(
 cbind(head(calendar[ind, 'date'], n = 7), head(calendar[ind, 'wm_yr_wk'], n= 7)),
 cbind(tail(calendar[ind, 'date'], n = 10), tail(calendar[ind, 'wm_yr_wk'], n = 10))
@@ -97,9 +100,59 @@ cbind(tail(calendar[ind, 'date'], n = 10), tail(calendar[ind, 'wm_yr_wk'], n = 1
 I find it interesting that there should be 24 weeks January 30th, 2016 and July 19th, 2016.
 
 ### Combine and Format the Data
+```{r}
+extract_ts = function(data, column){
+  # by stating the column, you are saying which columns you are wanting showed. Can
+  # be multiple columns
+  min_date = as.Date("2011-01-29", format = "%Y-%m-%d")
+  
+  data %>%
+    select(column, starts_with('d_')) %>% #This grabs only the column in the select()
+# (columns to pivot, name of column for pivoted columns, name of the column for data)
+    pivot_longer(starts_with("d_"), names_to = "dates", values_to = "sales") %>%
+    mutate(dates = as.integer(str_remove(dates, 'd_'))) %>% #This removes the d_
+    mutate(dates = min_date + dates - 1)
+  
+}
 
+s_df = head(train, n=50)
+column = c('id', 'state_id')
+extract_ts(s_df, column)
+
+```
 
 ### Exploratory Analysis
+By aggregating all of the sales for all of the items, categories, departments, stores, and states we can see a total sales time series plot.
+```{r}
+total_sales <- train %>% 
+  summarise_at(vars(starts_with("d_")), sum) %>% 
+  mutate(id = 1)
 
+total_sales = extract_ts(total_sales, c())
+plot(x = total_sales$dates, y = total_sales$sales, type = 'l', col = 'blue',
+     main = 'Total Sales by Date')
 
+```
+
+```{r}
+category_sales = train %>%
+  group_by(cat_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+category_sales = extract_ts(category_sales, c('cat_id'))
+
+ggplot(data=category_sales, aes(x=dates, y=sales, col = cat_id)) + geom_line() + ggtitle('Sales by Category')
+
+```
+
+```{r}
+state_sales = train %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+state_sales = extract_ts(state_sales, c('state_id'))
+
+ggplot(data=state_sales, aes(x=dates, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
+
+```
 

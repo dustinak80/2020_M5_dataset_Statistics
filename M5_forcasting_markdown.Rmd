@@ -30,7 +30,7 @@ library(ggplot2)
 
 ### Import the Data
 ```{r}
-setwd("C:/Users/Dustin/Desktop/Masters Program/Spring Semester/aa Applied Stats and Multivariate Analysis/Project/Data")
+setwd('C:/Users/Tokyo/Desktop/MSDS/Math6359 Multivariate Statistics/Project Data')
 
 #Import data
 train = vroom('sales_train_validation.csv', delim = ",", col_types = cols())
@@ -71,7 +71,7 @@ Here is the first 5 rows and last 5 rows of the data set:
 ```{r, echo=FALSE}
 rbind(head(calendar),tail(calendar))
 ```
-Lookint at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
+Looking at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
 
 This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an even and what that event type is. It also gives you information on whether that day is a Snap day or not in either of the three states.
 
@@ -91,6 +91,7 @@ By looking at this first year of values, you can see how this supports what was 
 ```{r, echo=FALSE} 
 ind = c(calendar['wm_yr_wk']>=11600)
 last_wk = max(calendar[ind, 'wm_yr_wk'])
+last_wk
 ```
 
 We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `r last_wk` which tells there is 21 weeks by looking at the last values.
@@ -184,7 +185,7 @@ total_sales = total_sales %>%
   mutate(year = as.numeric(format(date, "%Y")),
          month = as.numeric(format(date, "%m")))         
 total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
-total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
+total_sales = merge(total_sales, calendar[,c('date','wday')], by = 'date')
 #verify names
 names(total_sales)
 
@@ -193,20 +194,10 @@ sales_time_cor = cor(total_sales[,c('sales','year','month', 'week', 'wday')])[,'
 sales_time_cor
 ```
 
-We can see that year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
+We can see that the year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
 ```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(weekday), y=sales, fill = as.factor(weekday))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Weekday BoxPlots') + 
-  xlab('')
-```
-Is there a significant difference between Saturday and Sunday and the weekdays?
 
-```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(year), y=sales, fill = as.factor(year))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Year BoxPlots') + 
-  xlab('')
+
 ```
 
 
@@ -248,13 +239,124 @@ state_weekly = state_sales %>%
 ggplot(data=state_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
 
 ```
+```{r}
+state_weekly
+```
 
-Correlation between month and # of items sold
-Correlation between items sold and 
 
-1) Hypothesis Test - Saturday and Sunday statistically significant that the rest of     the week
-2) multivariate analysis - sales price and revenue (create the dataframe)
-3) Slopes of increase in sales per each state
-3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
-4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
-5) reference
+The following is a look at weekly sales by state. First, CA
+```{r}
+#California weekly sales
+
+train_CA <- train[train$state_id == 'CA',]
+
+CA_sales = train_CA %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+CA_sales = extract_ts(CA_sales, c('state_id'))
+CA_sales= inner_join(weekly, CA_sales, by ='date')
+
+#Groupby Weekly
+CA_weekly = CA_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+```{r}
+#Plot
+ggplot(data=CA_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('CA Sales') 
+```
+
+A linear regression gives us the value of the slope.
+```{r}
+summary(CA.lm <- lm(CA_weekly$sales ~ CA_weekly$date, data=CA_weekly))
+```
+
+```{r}
+plot(CA_weekly$date,CA_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'CA Sales', xlab= 'date', ylab = 'sales')
+abline(lm(CA_weekly$sales ~ CA_weekly$date))
+```
+A QQ plot shows that CA sales are normally distributed.
+```{r}
+plot(CA.lm,which = 2) #Normal Q-Q
+```
+
+Next is a look at weekly sales in Texas.
+```{r}
+#Texas Sales 
+train_TX = train[train$state_id == 'TX',]
+
+TX_sales = train_TX %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+TX_sales = extract_ts(TX_sales, c('state_id'))
+TX_sales= inner_join(weekly, TX_sales, by ='date')
+
+#Groupby Weekly
+TX_weekly = TX_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+
+```{r}
+#Plot
+ggplot(data=TX_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('TX Sales')
+
+```
+```{r}
+summary(TX.lm <- lm(TX_weekly$sales ~ TX_weekly$date, data=TX_weekly))
+
+```
+
+```{r}
+plot(TX_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'TX Sales', xlab= 'date', ylab = 'sales')
+abline(lm(TX_weekly$sales ~ TX_weekly$date))
+```
+
+A QQ plot shows that Texas sales are normally distributed.
+```{r}
+plot(TX.lm,which = 2) #Normal Q-Q
+```
+
+The following is a look at Wisconsin's weekly sales.
+```{r}
+#Wisconsin Sales 
+train_WI = train[train$state_id == 'WI',]
+
+WI_sales = train_WI %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+WI_sales = extract_ts(WI_sales, c('state_id'))
+WI_sales= inner_join(weekly, WI_sales, by ='date')
+
+#Groupby Weekly
+WI_weekly = WI_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+```{r}
+#Plot
+ggplot(data=WI_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('WI Sales')
+
+```
+```{r}
+summary(WI.lm <- lm(WI_weekly$sales ~ WI_weekly$date, data=WI_weekly))
+
+```
+```{r}
+plot(WI_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'WI Sales', xlab= 'date', ylab = 'sales')
+abline(lm(WI_weekly$sales ~ WI_weekly$date))
+```
+
+```{r}
+plot(WI.lm,which = 2) #Normal Q-Q
+```
+

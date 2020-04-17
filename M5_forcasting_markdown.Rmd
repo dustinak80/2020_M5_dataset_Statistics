@@ -20,6 +20,8 @@ library('tidyr') # data wrangling
 library('purrr') # data wrangling
 library('stringr') # string manipulation
 library('forcats') # factor manipulation
+#install.packages('lubridate')
+library('lubridate') # date and time
 
 #PLOTTING
 library(ggplot2)
@@ -73,28 +75,29 @@ Lookint at the first row and the last row of the data set, you can see the timel
 
 This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an even and what that event type is. It also gives you information on whether that day is a Snap day or not in either of the three states.
 
-To display the structure of the wm_yr_wk, lets look at the follwing code:
+To display the structure of the wm_yr_wk, lets look at the following code:
 ```{r, echo=FALSE}
 ind = c(calendar['wm_yr_wk']<=11201)
 #c(min(calendar[ind, 'wm_yr_wk']), max(calendar[ind, 'wm_yr_wk']))
 
 # wm_yr_wk = 1_yr starts_week of relative year
 rbind(
-cbind(head(calendar[ind, 'date'], n = 8), head(calendar[ind, 'wm_yr_wk'], n= 8)),
-cbind(tail(calendar[ind, 'date'], n = 15), tail(calendar[ind, 'wm_yr_wk'], n = 15))
+cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
+cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
 )
 ```
-By looking at this first year of values, you can see how this supports what was stated earlier about the wm_yr_wk values.
 
+By looking at this first year of values, you can see how this supports what was stated earlier about the wm_yr_wk values.
 ```{r, echo=FALSE} 
 ind = c(calendar['wm_yr_wk']>=11600)
 last_wk = max(calendar[ind, 'wm_yr_wk'])
 ```
+
 We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `r last_wk` which tells there is 21 weeks by looking at the last values.
 ```{r, echo=FALSE}
 rbind(
-cbind(head(calendar[ind, 'date'], n = 7), head(calendar[ind, 'wm_yr_wk'], n= 7)),
-cbind(tail(calendar[ind, 'date'], n = 10), tail(calendar[ind, 'wm_yr_wk'], n = 10))
+cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
+cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
 )
 ```
 I find it interesting that there should be 24 weeks January 30th, 2016 and July 19th, 2016.
@@ -109,9 +112,9 @@ extract_ts = function(data, column){
   data %>%
     select(column, starts_with('d_')) %>% #This grabs only the column in the select()
 # (columns to pivot, name of column for pivoted columns, name of the column for data)
-    pivot_longer(starts_with("d_"), names_to = "dates", values_to = "sales") %>%
-    mutate(dates = as.integer(str_remove(dates, 'd_'))) %>% #This removes the d_
-    mutate(dates = min_date + dates - 1)
+    pivot_longer(starts_with("d_"), names_to = "date", values_to = "sales") %>%
+    mutate(date = as.integer(str_remove(date, 'd_'))) %>% #This removes the d_
+    mutate(date = min_date + date - 1)
   
 }
 
@@ -119,6 +122,35 @@ s_df = head(train, n=50)
 column = c('id', 'state_id')
 extract_ts(s_df, column)
 
+#Weekly dataframe for merging with groups
+weekly = calendar[,c('date','wm_yr_wk')]
+
+week = c()
+for (i in calendar$wm_yr_wk){
+  if (i%%11100 < 54){
+    week = append(week, i%%11100)
+  }
+  else if(i%%11200 < 54){
+    week = append(week, i%%11200)
+  }
+  else if(i%%11300 < 54){
+    week = append(week, i%%11300)
+    }
+  else if(i%%11400 < 54){
+    week = append(week, i%%11400)
+  }
+  else if(i%%11500 < 54){
+    week = append(week, i%%11500)
+  }
+  else if(i%%11600 < 54){
+    week = append(week, i%%11600)
+  }
+  else{
+    print(i)
+  }
+}
+
+weekly = cbind(weekly, week)
 ```
 
 ### Exploratory Analysis
@@ -129,10 +161,54 @@ total_sales <- train %>%
   mutate(id = 1)
 
 total_sales = extract_ts(total_sales, c())
-plot(x = total_sales$dates, y = total_sales$sales, type = 'l', col = 'blue',
+plot(x = total_sales$date, y = total_sales$sales, type = 'l', col = 'blue',
      main = 'Total Sales by Date')
 
 ```
+```{r}
+sales_weekly = merge(weekly, total_sales, by = 'date')
+
+#groupby week and get the mean of that week for sales and start date
+sales_weekly = sales_weekly %>%  
+  group_by(wm_yr_wk) %>%
+  summarize(sales = mean(sales), date = min(date))
+
+plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue')
+
+```
+
+Let's look at the correlation between the sales and different aspects of time.
+```{r}
+#Add columns that give the year values, month values, week values
+total_sales = total_sales %>% 
+  mutate(year = as.numeric(format(date, "%Y")),
+         month = as.numeric(format(date, "%m")))         
+total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
+total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
+#verify names
+names(total_sales)
+
+#correlation plot of those time frames
+sales_time_cor = cor(total_sales[,c('sales','year','month', 'week', 'wday')])[,'sales']
+sales_time_cor
+```
+
+We can see that year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
+```{r, echo= FALSE}
+ggplot(total_sales, aes(x=as.factor(weekday), y=sales, fill = as.factor(weekday))) +   geom_boxplot() + 
+  theme( legend.position = 'none') + 
+  ggtitle('Weekday BoxPlots') + 
+  xlab('')
+```
+Is there a significant difference between Saturday and Sunday and the weekdays?
+
+```{r, echo= FALSE}
+ggplot(total_sales, aes(x=as.factor(year), y=sales, fill = as.factor(year))) +   geom_boxplot() + 
+  theme( legend.position = 'none') + 
+  ggtitle('Year BoxPlots') + 
+  xlab('')
+```
+
 
 ```{r}
 category_sales = train %>%
@@ -141,7 +217,16 @@ category_sales = train %>%
 
 category_sales = extract_ts(category_sales, c('cat_id'))
 
-ggplot(data=category_sales, aes(x=dates, y=sales, col = cat_id)) + geom_line() + ggtitle('Sales by Category')
+#Merge data to get week relative toyear
+category_sales = merge(weekly, category_sales, by = 'date')
+
+#groupby week and get the mean of that week for sales and start date
+category_weekly = category_sales %>%  
+  group_by(wm_yr_wk, cat_id) %>%
+  summarize(sales = mean(sales), date = min(date))
+
+#Plot the Data
+ggplot(data=category_weekly, aes(x=date, y=sales, col = cat_id)) + geom_line() + ggtitle('Sales by Category')
 
 ```
 
@@ -150,9 +235,26 @@ state_sales = train %>%
   group_by(state_id) %>%
   summarise_at(vars(starts_with("d_")), sum)
 
+#Merge with Weekly Data
 state_sales = extract_ts(state_sales, c('state_id'))
+state_sales = merge(weekly, state_sales, by = 'date')
 
-ggplot(data=state_sales, aes(x=dates, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
+#Groupby Weekly
+state_weekly = state_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= mean(sales), date = min(date))
+
+#Plot
+ggplot(data=state_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
 
 ```
 
+Correlation between month and # of items sold
+Correlation between items sold and 
+
+1) Hypothesis Test - Saturday and Sunday statistically significant that the rest of     the week
+2) multivariate analysis - sales price and revenue (create the dataframe)
+3) Slopes of increase in sales per each state
+3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
+4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
+5) reference

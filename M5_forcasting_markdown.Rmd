@@ -1,6 +1,6 @@
 ---
 title: "M5 Forecasting - Multivariate Analysis"
-author: "Dustin Vasquez"
+author: "Bryan Florence, Jordan Robles, Dustin Vasquez"
 date: "4/14/2020"
 output: word_document
 ---
@@ -71,9 +71,9 @@ Here is the first 5 rows and last 5 rows of the data set:
 ```{r, echo=FALSE}
 rbind(head(calendar),tail(calendar))
 ```
-Lookint at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
+Looking at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
 
-This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an even and what that event type is. It also gives you information on whether that day is a Snap day or not in either of the three states.
+This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an event and what that event type is. It also gives you information on whether that day is a SNAP day or not in either of the three states.
 
 To display the structure of the wm_yr_wk, lets look at the following code:
 ```{r, echo=FALSE}
@@ -118,9 +118,10 @@ extract_ts = function(data, column){
   
 }
 
-s_df = head(train, n=50)
-column = c('id', 'state_id')
-extract_ts(s_df, column)
+# Test the function
+# s_df = head(train, n=50)
+# column = c('id', 'state_id')
+# extract_ts(s_df, column)
 
 #Weekly dataframe for merging with groups
 weekly = calendar[,c('date','wm_yr_wk')]
@@ -154,7 +155,7 @@ weekly = cbind(weekly, week)
 ```
 
 ### Exploratory Analysis
-By aggregating all of the sales for all of the items, categories, departments, stores, and states we can see a total sales time series plot.
+By aggregating all of the sales for all of the items, categories, departments, stores, and states we can see a sales time series plot.
 ```{r}
 total_sales <- train %>% 
   summarise_at(vars(starts_with("d_")), sum) %>% 
@@ -173,8 +174,7 @@ sales_weekly = sales_weekly %>%
   group_by(wm_yr_wk) %>%
   summarize(sales = mean(sales), date = min(date))
 
-plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue')
-
+plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue', main = 'Sales Time Series - Weekly Mean')
 ```
 
 Let's look at the correlation between the sales and different aspects of time.
@@ -186,6 +186,7 @@ total_sales = total_sales %>%
 total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
 total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
 total_sales$weekend <- ifelse(total_sales$wday <=2 , 1, 0) 
+
 #verify names
 names(total_sales)
 
@@ -247,6 +248,232 @@ state_weekly = state_sales %>%
 
 #Plot
 ggplot(data=state_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
+
+```
+The following is a look at weekly sales by state. First is CA.
+```{r}
+#California weekly sales
+
+train_CA <- train[train$state_id == 'CA',]
+
+CA_sales = train_CA %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+CA_sales = extract_ts(CA_sales, c('state_id'))
+CA_sales= inner_join(weekly, CA_sales, by ='date')
+
+#Groupby Weekly
+CA_weekly = CA_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+```{r}
+#Plot
+ggplot(data=CA_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('CA Sales') 
+```
+
+A linear regression gives us the value of the slope.
+```{r}
+summary(CA.lm <- lm(CA_weekly$sales ~ CA_weekly$date, data=CA_weekly))
+```
+
+```{r}
+plot(CA_weekly$date,CA_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'CA Sales', xlab= 'date', ylab = 'sales')
+abline(lm(CA_weekly$sales ~ CA_weekly$date))
+```
+A QQ plot shows that CA sales are normally distributed.
+```{r}
+plot(CA.lm,which = 2) #Normal Q-Q
+```
+
+Next is a look at weekly sales in Texas.
+```{r}
+#Texas Sales 
+train_TX = train[train$state_id == 'TX',]
+
+TX_sales = train_TX %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+TX_sales = extract_ts(TX_sales, c('state_id'))
+TX_sales= inner_join(weekly, TX_sales, by ='date')
+
+#Groupby Weekly
+TX_weekly = TX_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+
+```{r}
+#Plot
+ggplot(data=TX_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('TX Sales')
+
+```
+```{r}
+summary(TX.lm <- lm(TX_weekly$sales ~ TX_weekly$date, data=TX_weekly))
+
+```
+
+```{r}
+plot(TX_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'TX Sales', xlab= 'date', ylab = 'sales')
+abline(lm(TX_weekly$sales ~ TX_weekly$date))
+```
+
+A QQ plot shows that Texas sales are normally distributed.
+```{r}
+plot(TX.lm,which = 2) #Normal Q-Q
+```
+
+The following is a look at Wisconsin's weekly sales.
+```{r}
+#Wisconsin Sales 
+train_WI = train[train$state_id == 'WI',]
+
+WI_sales = train_WI %>%
+  group_by(state_id) %>%
+  summarise_at(vars(starts_with("d_")), sum)
+
+#Merge with Weekly Data
+WI_sales = extract_ts(WI_sales, c('state_id'))
+WI_sales= inner_join(weekly, WI_sales, by ='date')
+
+#Groupby Weekly
+WI_weekly = WI_sales %>%
+  group_by(wm_yr_wk, state_id) %>%
+  summarise(sales= sum(sales), date = min(date))
+
+```
+```{r}
+#Plot
+ggplot(data=WI_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('WI Sales')
+
+```
+```{r}
+summary(WI.lm <- lm(WI_weekly$sales ~ WI_weekly$date, data=WI_weekly))
+
+```
+```{r}
+plot(WI_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'WI Sales', xlab= 'date', ylab = 'sales')
+abline(lm(WI_weekly$sales ~ WI_weekly$date))
+```
+
+```{r}
+plot(WI.lm,which = 2) #Normal Q-Q
+```
+Create the Sales and Revenue dataframe
+
+```{r}
+ind = train['state_id'] == 'CA'
+cali_rev = train[ind,]
+
+ind = train['state_id'] == 'TX'
+tex_rev = train[ind,]
+
+ind = train['state_id'] == 'WI'
+wis_rev = train[ind,]
+
+# Create a function to form the train data, group by wm_wk_yr, merge with price data
+get_rev = function(df_tr, df_pr, df_wk){
+  df_tr = df_tr %>%
+    group_by(item_id, store_id)
+  
+  df_tr = extract_ts(df_tr, c('item_id', 'store_id'))
+  print('extracted')
+  
+  #merge with weekly to wm_wk_yr
+  df_tr = inner_join(df_wk[,c('date','wm_yr_wk')],df_tr, by = 'date')
+  print('merged with week')
+  
+  #Group by wm_wk_yr and sum the sales
+  df_tr = df_tr %>%
+    group_by(wm_yr_wk, store_id, item_id) %>%
+    summarise(sales = sum(sales))
+  print('grouped by week')
+  
+  #merge with prices
+  df_tr = inner_join(df_tr, df_pr, by = c('store_id', 'item_id',
+                                                   'wm_yr_wk'))
+  print('merged with prices')
+  
+  #get Revenue for each item
+  df_tr$revenue = df_tr$sales*df_tr$sell_price
+  print('got revenue')
+
+  #Change order of the columns
+  df_tr = df_tr[c('item_id', 'store_id', 'wm_yr_wk', 'sales', 'sell_price',
+                          'revenue')]
+}
+
+wis_rev = get_rev(wis_rev, prices, weekly)
+tex_rev = get_rev(tex_rev, prices, weekly)
+cali_rev = get_rev(cali_rev, prices, weekly)
+
+#Export to excel
+vroom_write(wis_rev, 'wis_rev.csv', ',')
+vroom_write(tex_rev, 'tex_rev.csv', ',')
+vroom_write(cali_rev, 'cali_rev.csv', ',')
+```
+
+```{r, echo=FALSE}
+setwd("C:/Users/Dustin/Desktop/Masters Program/Spring Semester/aa Applied Stats and Multivariate Analysis/Project/Data")
+
+wis_rev = vroom('wis_rev.csv', delim = ',', col_types = cols())
+tex_rev = vroom('tex_rev.csv', delim = ',', col_types = cols())
+cali_rev = vroom('cali_rev.csv', delim = ',', col_types = cols())
+```
+Group the data by stores and sum the revenue and sales and Get the Stats
+```{r}
+#Get the store revenues and sales
+wis_stores = wis_rev %>%
+  group_by(store_id) %>%
+  summarise(sales = sum(sales), revenue = sum(revenue))
+
+tex_stores = tex_rev %>%
+  group_by(store_id) %>%
+  summarise(sales = sum(sales), revenue = sum(revenue))
+
+cali_stores = cali_rev %>%
+  group_by(store_id) %>%
+  summarise(sales = sum(sales), revenue = sum(revenue))
+
+#combine them
+stores = rbind(cali_stores,
+               tex_stores,
+               wis_stores)
+
+#Get the Stats
+stats = function(df){
+  features = sapply(df, is.numeric)
+  
+  Mean = sapply(df[features], mean)
+  Std.Dev = sapply(df[features], sd)
+  Min = sapply(df[features], min)
+  Median = sapply(df[features], median)
+  Max = sapply(df[features], max)
+  
+  stats = rbind(Mean, Std.Dev, Min, Median, Max)
+}
+
+stores_stats = stats(stores)/1000000 #in millions
+
+stores_stats
+```
+
+Do the scatter Plot with box plots
+```{r}
+#Creating Scatterplot with Boxplot 
+par(fig=c(0,0.8,0,0.8), new=TRUE) 
+plot(stores$sales/1000000, stores$revenue/1000000, xlab="Sales", ylab="Revenue")
+par(fig=c(0,0.8,0.5,1), new=TRUE) 
+boxplot(stores$sales/1000000, horizontal=TRUE, axes=FALSE) 
+par(fig=c(0.65,1,0,0.8),new=TRUE) 
+boxplot(stores$revenue/1000000, axes=FALSE)
+mtext("Revenue vs. Sales (in millions)", side=3, outer=TRUE, line=-3)
 
 ```
 

@@ -83,7 +83,7 @@ ind = c(calendar['wm_yr_wk']<=11201)
 # wm_yr_wk = 1_yr starts_week of relative year
 rbind(
 cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
-cbind(tail(calendar[ind, 'date'], n = 8), tail(calendar[ind, 'wm_yr_wk'], n = 8))
+cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
 )
 ```
 
@@ -175,7 +175,6 @@ sales_weekly = sales_weekly %>%
   summarize(sales = mean(sales), date = min(date))
 
 plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue', main = 'Sales Time Series - Weekly Mean')
-
 ```
 
 Let's look at the correlation between the sales and different aspects of time.
@@ -190,7 +189,7 @@ total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'd
 #verify names
 names(total_sales)
 
-#correlation of those time frames
+#correlation plot of those time frames
 sales_time_cor = cor(total_sales[,c('sales','year','month', 'week', 'wday')])[,'sales']
 sales_time_cor
 ```
@@ -363,6 +362,13 @@ mtext("Revenue vs. Sales (in millions)", side=3, outer=TRUE, line=-3)
 
 ```
 
+Correlation between month and # of items sold
+Correlation between items sold and 
 
-
+1) Hypothesis Test - Saturday and Sunday statistically significant that the rest of     the week
+2) multivariate analysis - sales price and revenue (create the dataframe)
+3) Slopes of increase in sales per each state
+3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
+4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
+5) reference
 

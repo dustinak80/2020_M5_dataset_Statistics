@@ -184,7 +184,7 @@ total_sales = total_sales %>%
   mutate(year = as.numeric(format(date, "%Y")),
          month = as.numeric(format(date, "%m")))         
 total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
-total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
+total_sales = merge(total_sales, calendar[,c('date','wday')], by = 'date')
 #verify names
 names(total_sales)
 
@@ -193,20 +193,10 @@ sales_time_cor = cor(total_sales[,c('sales','year','month', 'week', 'wday')])[,'
 sales_time_cor
 ```
 
-We can see that year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
+We can see that the year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
 ```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(weekday), y=sales, fill = as.factor(weekday))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Weekday BoxPlots') + 
-  xlab('')
-```
-Is there a significant difference between Saturday and Sunday and the weekdays?
 
-```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(year), y=sales, fill = as.factor(year))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Year BoxPlots') + 
-  xlab('')
+
 ```
 
 
@@ -251,10 +241,3 @@ ggplot(data=state_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + 
 
 Correlation between month and # of items sold
 Correlation between items sold and 
-
-1) Hypothesis Test - Saturday and Sunday statistically significant that the rest of     the week
-2) multivariate analysis - sales price and revenue (create the dataframe)
-3) Slopes of increase in sales per each state
-3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
-4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
-5) reference

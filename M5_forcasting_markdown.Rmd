@@ -1,7 +1,6 @@
-=======
 ---
 title: "M5 Forecasting - Multivariate Analysis"
-author: "Dustin Vasquez"
+author: "Bryan Florence, Jordan Robles, Dustin Vasquez"
 date: "4/14/2020"
 output: word_document
 ---
@@ -186,6 +185,7 @@ total_sales = total_sales %>%
          month = as.numeric(format(date, "%m")))         
 total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
 total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
+total_sales$weekend <- ifelse(total_sales$wday <=2 , 1, 0) 
 
 #verify names
 names(total_sales)
@@ -486,4 +486,3 @@ Correlation between items sold and
 3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
 4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
 5) reference
-

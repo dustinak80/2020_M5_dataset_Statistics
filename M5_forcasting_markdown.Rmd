@@ -26,10 +26,82 @@ library('lubridate') # date and time
 #PLOTTING
 library(ggplot2)
 
+#FOR RMARKDOWN
+library('knitr')
+```
+
+```{r, echo=FALSE, warning=FALSE}
+####  USE THIS CHUNK FOR FUNCTIONS
+
+#Get the Stats
+stats = function(df){
+  features = sapply(df, is.numeric)
+
+  Mean = sapply(df[features], mean)
+  Std.Dev = sapply(df[features], sd)
+  Min = sapply(df[features], min)
+  Median = sapply(df[features], median)
+  Max = sapply(df[features], max)
+
+  stats = rbind(Mean, Std.Dev, Min, Median, Max)
+}
+
+#### PIVOT TABLE FOR TIME SERIES
+extract_ts = function(data, column){
+  # by stating the column, you are saying which columns you are wanting showed. Can
+  # be multiple columns
+  min_date = as.Date("2011-01-29", format = "%Y-%m-%d")
+
+  data %>%
+    select(column, starts_with('d_')) %>% #This grabs only the column in the select()
+# (columns to pivot, name of column for pivoted columns, name of the column for data)
+    pivot_longer(starts_with("d_"), names_to = "date", values_to = "sales") %>%
+    mutate(date = as.integer(str_remove(date, 'd_'))) %>% #This removes the d_
+    mutate(date = min_date + date - 1)
+
+}
+
+# Test the function
+# s_df = head(train, n=50)
+# column = c('id', 'state_id')
+# extract_ts(s_df, column)
+
+# Create a function to form the train data, group by wm_wk_yr, merge with price data
+get_rev = function(df_tr, df_pr, df_wk){
+  df_tr = df_tr %>%
+    group_by(item_id, store_id)
+
+  df_tr = extract_ts(df_tr, c('item_id', 'store_id'))
+  print('extracted')
+
+  #merge with weekly to wm_wk_yr
+  df_tr = inner_join(df_wk[,c('date','wm_yr_wk')],df_tr, by = 'date')
+  print('merged with week')
+
+  #Group by wm_wk_yr and sum the sales
+  df_tr = df_tr %>%
+    group_by(wm_yr_wk, store_id, item_id) %>%
+    summarise(sales = sum(sales))
+  print('grouped by week')
+
+  #merge with prices
+  df_tr = inner_join(df_tr, df_pr, by = c('store_id', 'item_id',
+                                                   'wm_yr_wk'))
+  print('merged with prices')
+
+  #get Revenue for each item
+  df_tr$revenue = df_tr$sales*df_tr$sell_price
+  print('got revenue')
+
+  #Change order of the columns
+  df_tr = df_tr[c('item_id', 'store_id', 'wm_yr_wk', 'sales', 'sell_price',
+                          'revenue')]
+}
+
 ```
 
 ### Import the Data
-```{r}
+```{r, echo=FALSE, warning=FALSE}
 setwd("C:/Users/Dustin/Desktop/Masters Program/Spring Semester/aa Applied Stats and Multivariate Analysis/Project/Data")
 
 #Import data
@@ -38,91 +110,107 @@ prices = vroom('sell_prices.csv', delim = ",", col_types = cols())
 calendar = read_csv('calendar.csv', col_types = cols())
 ```
 
-### Look at the Data
 #### Train Data
-The columns of the train data are as follows:
 ```{r, echo=FALSE}
-c(names(train[,1:8]),'....',names(train[,1915:1919]))
+column_names = c(names(train[,1:8]),'....',names(train[,1915:1919]))
+dim = dim(train)
+```
+The train data has a size of `r dim` with the following names:  
+`r column_names`  
+Looking at this, I initially see that we will need to pivot the day columns in order to make it workeable.  
+  
+Here is a quick look at the top 5 rows for some of the columns.  
+```{r, echo=FALSE}
+kable(cbind(train[1:5,2:7], train[1:5,1915:1919]))
 ```
 
-Here is a look at the first 5 rows of the first 7 and last 4 columns
+Looking at the unique values in the qualitative columns of the dataframe, shown in the table below, you can kind of get an idea of what this dataframe is telling us. You can see that there are 3049 items spread out through 10 stores in 3 different states. A lot of these items are repeated through the different stores. You can also see that in each store there are 3 categories with 7 departments.  
 ```{r, echo=FALSE}
-cbind(train[1:5,1:7], train[1:5,1915:1919])
+#Get unique values in qualitative values
+column_names = names(train[,2:6])
+train_counts = matrix(nrow = 1, ncol = 5, dimnames = list('unique', column_names))
+for (i in column_names){
+  train_counts[,i] = n_distinct(train[,i])
+}
+kable(train_counts)
 ```
 
-#### Prices Data
-The columns of the Price Data is as follows:
+The table below is the distribution of 3 random days for all the items through all of the stores and categories. With the Median value being 0, you can see that a lot of these values are zero. This is because they will not always sell all of the items all of the time, or some may have been discontinued. The amount of zeros doesn't pose much of a threat since we are aggregating over different variables and time.  
 ```{r, echo = FALSE}
-names(prices)
+column_names = sample(names(train[,7:1919]) , size = 3)
+kable(stats(train[,column_names]))
 ```
-Here is a look at the first 5 and last 5 rows of the data set
+#### Prices Data
+```{r, echo = FALSE}
+column_names = names(prices)
+dim = dim(train)
+```
+The prices data frame has a size of `r dim` with the following column names:  
+`r column_names`  
+You can see that there are a couple of rows that tie this data frame to the train data frame, which are `r column_names[1:2]`.  
+  
+Here is a quick look at the head of the dataframe.  
 ```{r, echo=FALSE}
-rbind(head(prices),tail(prices))
+kable(rbind(head(prices)))
 ```
-This data set gives you the store id and item id which is equal to the values in the data set. The wm_yr_wk that is used in the calendar data represents the year that the week count was started and the sequence of weeks in that year. Since this data sets first values start on 1/29/13 the first wm_yr_wk is 11301, then in one year, 1/22/14 you will reach 11352. From there it goes to 11401 and follows on until there is no more data. This will be better displayed in the following dataset. 
 
+The only new real interesting variable we get from this dataframe is the "sell_price" variable, which we can use to calculate revenue later. The sell price is given as a weekly average of the price for that item at that store. The stats and box-plot of this value are shown below.  
+```{r, echo = FALSE}
+kable(stats(prices[,'sell_price']))
+boxplot(prices[,'sell_price'], main = 'Sell Price', ylab = 'Dollars')
+```
+
+Looking at the box plot, you can see that a lot of the item prices are pretty low with a select few of them reaching over 40 dollars.  
+  
 #### Calendar Data
-The columns in the calendar data are as follows:
+The columns in the calendar data are as follows:  
 ```{r, echo=FALSE}
-names(calendar)
+column_names = names(calendar)
+dim = dim(calendar)
+```
+The calendar data frame has a size of `r dim` with the following column names:  
+`r column_names`  
+The column `r column_names[7]` is the column name that ties this dataset back to the train dataset.  
+  
+By looking at the first and last values in the data frame, we can see that the time frame from 2011-01-29 to 2016-06-19.  
+# ```{r, echo=FALSE}
+# kable(rbind(head(calendar, n= 3),tail(calendar, n=3)))
+# ```
+
+This data set also gives you data on whether there is an event and what that event type is. It also gives you information on whether that day is a SNAP day or not in either of the three states. The number of Holidays and Holiday types are displayed in the table below.  
+```{r, echo=FALSE}
+#Get unique values in qualitative values
+column_names = names(calendar[,8:14])
+calendar_counts = matrix(nrow = 2, ncol = length(column_names), 
+                      dimnames = list(c('count','unique'), column_names))
+for (i in column_names){
+  calendar_counts['unique',i] = n_distinct(calendar[,i])
+  if (i == column_names[5] || i == column_names[6] || i == column_names[7]){
+    calendar_counts['count',i] = sum(calendar[,i])
+  }
+  else{
+    calendar_counts['count',i] = dim[1]-sum(is.na(calendar[,i]))
+  }
+}
+kable(calendar_counts)
 ```
 
-Here is the first 5 rows and last 5 rows of the data set:
-```{r, echo=FALSE}
-rbind(head(calendar),tail(calendar))
-```
-Looking at the first row and the last row of the data set, you can see the timeline is from 1/29/13 to 6/19/2016.
-
-This data set contains data information such as the date, wm_yr_wk, weekday, month, year, and d. The d relates to the data in the train set, where the days are the columns. This data set also gives you data on whether there is an event and what that event type is. It also gives you information on whether that day is a SNAP day or not in either of the three states.
-
-To display the structure of the wm_yr_wk, lets look at the following code:
-```{r, echo=FALSE}
+There are not a lot of events throughout the year that this keeps track of, just 31 unique events in all of the 5 plus years. Each state only has a total of 650 SNAP days because they are required to have so many in 1 year.  
+  
+The "wm_yr_wk" column tracks the number of weeks in a year but it does it in a tricky way. It start the 1st week on the first day of data collection, and starts it count there. So week 52 of the first year will actually be around 2012-01-30. This can be seen with the following table, which looks at the 1st 5 values of the first year and the second year.  
+```{r, echo=FALSE, warning=FALSE}
 ind = c(calendar['wm_yr_wk']<=11201)
 #c(min(calendar[ind, 'wm_yr_wk']), max(calendar[ind, 'wm_yr_wk']))
 
 # wm_yr_wk = 1_yr starts_week of relative year
-rbind(
-cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
-cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
-)
+kable(
+  rbind(
+  cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
+  cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
+  ))
 ```
 
-By looking at this first year of values, you can see how this supports what was stated earlier about the wm_yr_wk values.
-```{r, echo=FALSE} 
-ind = c(calendar['wm_yr_wk']>=11600)
-last_wk = max(calendar[ind, 'wm_yr_wk'])
-```
-
-We can also know that there are about 28 weeks between January 1st and July 19. But in the data, the wm_yr_wk for the last day is `r last_wk` which tells there is 21 weeks by looking at the last values.
-```{r, echo=FALSE}
-rbind(
-cbind(head(calendar[ind, 'date'], n = 5), head(calendar[ind, 'wm_yr_wk'], n= 5)),
-cbind(tail(calendar[ind, 'date'], n = 5), tail(calendar[ind, 'wm_yr_wk'], n = 5))
-)
-```
-I find it interesting that there should be 24 weeks January 30th, 2016 and July 19th, 2016.
-
-### Combine and Format the Data
-```{r}
-extract_ts = function(data, column){
-  # by stating the column, you are saying which columns you are wanting showed. Can
-  # be multiple columns
-  min_date = as.Date("2011-01-29", format = "%Y-%m-%d")
-  
-  data %>%
-    select(column, starts_with('d_')) %>% #This grabs only the column in the select()
-# (columns to pivot, name of column for pivoted columns, name of the column for data)
-    pivot_longer(starts_with("d_"), names_to = "date", values_to = "sales") %>%
-    mutate(date = as.integer(str_remove(date, 'd_'))) %>% #This removes the d_
-    mutate(date = min_date + date - 1)
-  
-}
-
-# Test the function
-# s_df = head(train, n=50)
-# column = c('id', 'state_id')
-# extract_ts(s_df, column)
-
+```{r, echo=FALSE, warning=FALSE}
 #Weekly dataframe for merging with groups
 weekly = calendar[,c('date','wm_yr_wk')]
 
@@ -154,11 +242,11 @@ for (i in calendar$wm_yr_wk){
 weekly = cbind(weekly, week)
 ```
 
-### Exploratory Analysis
-By aggregating all of the sales for all of the items, categories, departments, stores, and states we can see a sales time series plot.
-```{r}
-total_sales <- train %>% 
-  summarise_at(vars(starts_with("d_")), sum) %>% 
+## Exploratory Analysis
+By aggregating all of the sales and pivoting the training table we can see the amount sales for each day in all 10 of the stores. The following time series chart shows how the total sales changes per day through out this time frame.  
+```{r, echo=FALSE, warnings = FALSE}
+total_sales <- train %>%
+  summarise_at(vars(starts_with("d_")), sum) %>%
   mutate(id = 1)
 
 total_sales = extract_ts(total_sales, c())
@@ -166,53 +254,72 @@ plot(x = total_sales$date, y = total_sales$sales, type = 'l', col = 'blue',
      main = 'Total Sales by Date')
 
 ```
-```{r}
-sales_weekly = merge(weekly, total_sales, by = 'date')
+
+You can see the seasonality in the sales of these stores of where the shopping dies down at the end and begging of the years and peaks kind of late middle of the year. The drops at the end of every year are Christmas where the stores are closed for part of the day.  
+  
+We can also look at this weekly instead of daily to reduce the noise by summing up the total sales in a week, which is displayed below.  
+
+```{r, echo=FALSE}
+sales_weekly = inner_join(weekly, total_sales, by = 'date')
 
 #groupby week and get the mean of that week for sales and start date
-sales_weekly = sales_weekly %>%  
+sales_weekly = sales_weekly %>%
   group_by(wm_yr_wk) %>%
-  summarize(sales = mean(sales), date = min(date))
+  summarize(sales = sum(sales), date = min(date))
 
-plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue', main = 'Sales Time Series - Weekly Mean')
+plot(x = sales_weekly$date, y = sales_weekly$sales, type = 'l', col = 'blue', main = 'Sales Time Series - Weekly Sum')
 ```
 
-Let's look at the correlation between the sales and different aspects of time.
-```{r}
+One thing we can dive deeper into is how the sales correlates to different aspects of times, such as year, month, week, week day. The following is the correlation between sales and those factors.
+
+```{r, echo = FALSE}
 #Add columns that give the year values, month values, week values
-total_sales = total_sales %>% 
+total_sales = total_sales %>%
   mutate(year = as.numeric(format(date, "%Y")),
-         month = as.numeric(format(date, "%m")))         
-total_sales = merge(total_sales, weekly[,c('date','week')], by = 'date')
-total_sales = merge(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
-total_sales$weekend <- ifelse(total_sales$wday <=2 , 1, 0) 
+         month = as.numeric(format(date, "%m")))
+total_sales = inner_join(total_sales, weekly[,c('date','week')], by = 'date')
+total_sales = inner_join(total_sales, calendar[,c('date','wday', 'weekday')], by = 'date')
+total_sales$weekend <- ifelse(total_sales$wday <=2 , 1, 0)
 
 #verify names
-names(total_sales)
+#names(total_sales)
 
 #correlation plot of those time frames
 sales_time_cor = cor(total_sales[,c('sales','year','month', 'week', 'wday')])[,'sales']
-sales_time_cor
+kable(sales_time_cor, col.names = 'r')
 ```
 
-We can see that year and day of the week have the most correlation with sales. Lets look at the distribution of these variables.
-```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(weekday), y=sales, fill = as.factor(weekday))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Weekday BoxPlots') + 
-  xlab('')
-```
-Is there a significant difference between Saturday and Sunday and the weekdays?
+The two factors that correlate the most with sales are year and wday, and even those are not great. Month and week number in the year have pretty much no correlation.  
+  
+### Comparison of Sales and Weekday
+The following plot is a box plot of the days in the week and sales. By looking at this plot, it appears that there are more sales on the weekend than in the rest of the week. It also appears like there is less shopping in the middle of the week then there is in the rest of the week.
 
 ```{r, echo= FALSE}
-ggplot(total_sales, aes(x=as.factor(year), y=sales, fill = as.factor(year))) +   geom_boxplot() + 
-  theme( legend.position = 'none') + 
-  ggtitle('Year BoxPlots') + 
+ggplot(total_sales, aes(x=as.factor(weekday), y=sales, fill = as.factor(weekday))) +   geom_boxplot() +
+  theme( legend.position = 'none') +
+  ggtitle('Weekday BoxPlots') +
   xlab('')
 ```
 
+One thing we will touch into is doing the Anova test on the weekdays and seeing which day, if any stands out the most.  
+  
+We also, want to do the following hypothesis test, such as the following:  
+$H_{0}: \mu_{wkend} = \mu_{wkday}$  
+$H_{a}: \mu_{wkend} > \mu_{wkday}$  
 
-```{r}
+This way we can see if the evidence supports whether there is more shopping on the weekend or not.  
+  
+This next chart shows the box plots of the sales through each year in the dataframe.  
+```{r, echo= FALSE}
+ggplot(total_sales, aes(x=as.factor(year), y=sales, fill = as.factor(year))) +   geom_boxplot() +
+  theme( legend.position = 'none') +
+  ggtitle('Year BoxPlots') +
+  xlab('')
+```
+
+This appears to show that there is a steady increase in sales as the years progress. The next graph shows a time series of sales by each category: food, household, and hobbies.  
+
+```{r, echo=FALSE}
 category_sales = train %>%
   group_by(cat_id) %>%
   summarise_at(vars(starts_with("d_")), sum)
@@ -220,38 +327,48 @@ category_sales = train %>%
 category_sales = extract_ts(category_sales, c('cat_id'))
 
 #Merge data to get week relative toyear
-category_sales = merge(weekly, category_sales, by = 'date')
+category_sales = inner_join(weekly, category_sales, by = 'date')
 
 #groupby week and get the mean of that week for sales and start date
-category_weekly = category_sales %>%  
+category_weekly = category_sales %>%
   group_by(wm_yr_wk, cat_id) %>%
-  summarize(sales = mean(sales), date = min(date))
+  summarize(sales = sum(sales), date = min(date))
 
 #Plot the Data
 ggplot(data=category_weekly, aes(x=date, y=sales, col = cat_id)) + geom_line() + ggtitle('Sales by Category')
 
 ```
 
-```{r}
+### Comparison of States
+The next graph shows a time series of sales by each category: California, Texas, and Wisconsin.  
+
+```{r, echo=FALSE}
 state_sales = train %>%
   group_by(state_id) %>%
   summarise_at(vars(starts_with("d_")), sum)
 
 #Merge with Weekly Data
 state_sales = extract_ts(state_sales, c('state_id'))
-state_sales = merge(weekly, state_sales, by = 'date')
+state_sales = inner_join(weekly, state_sales, by = 'date')
 
 #Groupby Weekly
 state_weekly = state_sales %>%
   group_by(wm_yr_wk, state_id) %>%
-  summarise(sales= mean(sales), date = min(date))
+  summarise(sales= sum(sales), date = min(date))
 
 #Plot
-ggplot(data=state_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('Sales by State')
+ggplot(data=state_weekly, aes(x=date, y=sales/1000, col = state_id)) + geom_line() + ggtitle('Sales by State (in thousands)')
 
 ```
+
+Looking at the graph, it almost appears that every state has its own rate for increase in sales per time. It appears that CA and WI may be similar but TX seems to be less steep than the other two. We will also like to compare the rates of sales increase in each step by looking at the followinig.  
+
+$H_{0}: \beta_{1,CA} = \beta_{1,TX} = \beta_{1,WI}$  
+$H_{a}: \beta_{1,i} \neq \beta_{1,j} ~~\forall~~i,j = CA, TX, WI~~and~~i \neq j$  
+  
 The following is a look at weekly sales by state. First is CA.
-```{r}
+
+```{r, echo=FALSE}
 #California weekly sales
 
 train_CA <- train[train$state_id == 'CA',]
@@ -269,29 +386,34 @@ CA_weekly = CA_sales %>%
   group_by(wm_yr_wk, state_id) %>%
   summarise(sales= sum(sales), date = min(date))
 
-```
-```{r}
 #Plot
-ggplot(data=CA_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('CA Sales') 
+ggplot(data=CA_weekly, aes(x=date, y=sales/1000, col = state_id)) + geom_line() + ggtitle('CA Sales')
 ```
 
-A linear regression gives us the value of the slope.
-```{r}
+A linear regression gives us our $\beta_{0}$ and $\beta{1}$ coefficents, as displayed in the following table.  
+
+```{r, echo = FALSE}
 summary(CA.lm <- lm(CA_weekly$sales ~ CA_weekly$date, data=CA_weekly))
 ```
 
-```{r}
+We can also see our fitted line with the following chart.  
+
+```{r, echo = FALSE}
 plot(CA_weekly$date,CA_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'CA Sales', xlab= 'date', ylab = 'sales')
 abline(lm(CA_weekly$sales ~ CA_weekly$date))
 ```
-A QQ plot shows that CA sales are normally distributed.
-```{r}
-plot(CA.lm,which = 2) #Normal Q-Q
+
+The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier, which may need further investigation.  
+
+```{r, echo=FALSE}
+plot(CA.lm, which = 2) #Normal Q-Q
+plot(CA.lm, which = 1)
 ```
 
 Next is a look at weekly sales in Texas.
-```{r}
-#Texas Sales 
+
+```{r, echo = FALSE}
+#Texas Sales
 train_TX = train[train$state_id == 'TX',]
 
 TX_sales = train_TX %>%
@@ -307,31 +429,37 @@ TX_weekly = TX_sales %>%
   group_by(wm_yr_wk, state_id) %>%
   summarise(sales= sum(sales), date = min(date))
 
-```
-
-```{r}
 #Plot
 ggplot(data=TX_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('TX Sales')
 
 ```
-```{r}
-summary(TX.lm <- lm(TX_weekly$sales ~ TX_weekly$date, data=TX_weekly))
 
+The following is the linear model table for Texas.  
+
+```{r, echo = FALSE}
+summary(TX.lm <- lm(TX_weekly$sales ~ TX_weekly$date, data=TX_weekly))
 ```
 
-```{r}
+You can see that Texa's slope is `r as.numeric(TX.lm$coef[2])` and California's slope is `r as.numeric(CA.lm$coef[2])`.  
+  
+The following is the plot of the fitted line. 
+
+```{r, echo = FALSE}
 plot(TX_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'TX Sales', xlab= 'date', ylab = 'sales')
 abline(lm(TX_weekly$sales ~ TX_weekly$date))
 ```
 
-A QQ plot shows that Texas sales are normally distributed.
-```{r}
+The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
+
+```{r, echo = FALSE}
 plot(TX.lm,which = 2) #Normal Q-Q
+plot(TX.lm,which = 1) #Normal Q-Q
 ```
 
-The following is a look at Wisconsin's weekly sales.
-```{r}
-#Wisconsin Sales 
+The following is a look at Wisconsin's weekly sales.  
+
+```{r, echo = FALSE}
+#Wisconsin Sales
 train_WI = train[train$state_id == 'WI',]
 
 WI_sales = train_WI %>%
@@ -347,87 +475,65 @@ WI_weekly = WI_sales %>%
   group_by(wm_yr_wk, state_id) %>%
   summarise(sales= sum(sales), date = min(date))
 
-```
-```{r}
 #Plot
 ggplot(data=WI_weekly, aes(x=date, y=sales, col = state_id)) + geom_line() + ggtitle('WI Sales')
 
 ```
+
+The following is the linear model table for Wisconsin.  
+
 ```{r}
 summary(WI.lm <- lm(WI_weekly$sales ~ WI_weekly$date, data=WI_weekly))
-
 ```
-```{r}
+
+You can see that Texas' slope is `r as.numeric(TX.lm$coef[2])`, California's slope is `r as.numeric(CA.lm$coef[2])`, and Wisconsin's slope is `r as.numeric(WI.lm$coef[2])`.   
+  
+The following is plot of the fitted line.  
+
+```{r, echo = FALSE}
 plot(WI_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'WI Sales', xlab= 'date', ylab = 'sales')
 abline(lm(WI_weekly$sales ~ WI_weekly$date))
 ```
 
-```{r}
+The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
+
+```{r, echo = FALSE}
 plot(WI.lm,which = 2) #Normal Q-Q
+plot(WI.lm,which = 1)
 ```
-Create the Sales and Revenue dataframe
-
-```{r}
-ind = train['state_id'] == 'CA'
-cali_rev = train[ind,]
-
-ind = train['state_id'] == 'TX'
-tex_rev = train[ind,]
-
-ind = train['state_id'] == 'WI'
-wis_rev = train[ind,]
-
-# Create a function to form the train data, group by wm_wk_yr, merge with price data
-get_rev = function(df_tr, df_pr, df_wk){
-  df_tr = df_tr %>%
-    group_by(item_id, store_id)
+The next step will be actually doing the Hypothesis test on the difference in the $\beta_{1}$ coefficients for each of these states.  
   
-  df_tr = extract_ts(df_tr, c('item_id', 'store_id'))
-  print('extracted')
-  
-  #merge with weekly to wm_wk_yr
-  df_tr = inner_join(df_wk[,c('date','wm_yr_wk')],df_tr, by = 'date')
-  print('merged with week')
-  
-  #Group by wm_wk_yr and sum the sales
-  df_tr = df_tr %>%
-    group_by(wm_yr_wk, store_id, item_id) %>%
-    summarise(sales = sum(sales))
-  print('grouped by week')
-  
-  #merge with prices
-  df_tr = inner_join(df_tr, df_pr, by = c('store_id', 'item_id',
-                                                   'wm_yr_wk'))
-  print('merged with prices')
-  
-  #get Revenue for each item
-  df_tr$revenue = df_tr$sales*df_tr$sell_price
-  print('got revenue')
+### Comparison of Sales and Revenue by Store
+The next thing we want to look at is how the sales and revenue of the ten stores compares to eachother.
+# ```{r, echo = FALSE}
+# ind = train['state_id'] == 'CA'
+# cali_rev = train[ind,]
+# 
+# ind = train['state_id'] == 'TX'
+# tex_rev = train[ind,]
+# 
+# ind = train['state_id'] == 'WI'
+# wis_rev = train[ind,]
+# 
+# wis_rev = get_rev(wis_rev, prices, weekly)
+# tex_rev = get_rev(tex_rev, prices, weekly)
+# cali_rev = get_rev(cali_rev, prices, weekly)
+# 
+# #Export to excel
+# vroom_write(wis_rev, 'wis_rev.csv', ',')
+# vroom_write(tex_rev, 'tex_rev.csv', ',')
+# vroom_write(cali_rev, 'cali_rev.csv', ',')
+# ```
 
-  #Change order of the columns
-  df_tr = df_tr[c('item_id', 'store_id', 'wm_yr_wk', 'sales', 'sell_price',
-                          'revenue')]
-}
-
-wis_rev = get_rev(wis_rev, prices, weekly)
-tex_rev = get_rev(tex_rev, prices, weekly)
-cali_rev = get_rev(cali_rev, prices, weekly)
-
-#Export to excel
-vroom_write(wis_rev, 'wis_rev.csv', ',')
-vroom_write(tex_rev, 'tex_rev.csv', ',')
-vroom_write(cali_rev, 'cali_rev.csv', ',')
-```
-
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 setwd("C:/Users/Dustin/Desktop/Masters Program/Spring Semester/aa Applied Stats and Multivariate Analysis/Project/Data")
 
 wis_rev = vroom('wis_rev.csv', delim = ',', col_types = cols())
 tex_rev = vroom('tex_rev.csv', delim = ',', col_types = cols())
 cali_rev = vroom('cali_rev.csv', delim = ',', col_types = cols())
 ```
-Group the data by stores and sum the revenue and sales and Get the Stats
-```{r}
+
+```{r, echo = FALSE}
 #Get the store revenues and sales
 wis_stores = wis_rev %>%
   group_by(store_id) %>%
@@ -446,43 +552,31 @@ stores = rbind(cali_stores,
                tex_stores,
                wis_stores)
 
-#Get the Stats
-stats = function(df){
-  features = sapply(df, is.numeric)
-  
-  Mean = sapply(df[features], mean)
-  Std.Dev = sapply(df[features], sd)
-  Min = sapply(df[features], min)
-  Median = sapply(df[features], median)
-  Max = sapply(df[features], max)
-  
-  stats = rbind(Mean, Std.Dev, Min, Median, Max)
-}
-
 stores_stats = stats(stores)/1000000 #in millions
-
-stores_stats
 ```
+  
+The following two tables show the sales and revenue for each store throughout the entire time frame and the basic descriptive statics for each variable, sales and revenue.  
+```{r, echo = FALSE}
+kable(stores)
+kable(stores_stats)
+```
+  
+The following graph show the scatter plot with box plots of this data. Our next steps will be to do a multivariate analysis of the data and see if we find anything significant.  
 
-Do the scatter Plot with box plots
-```{r}
-#Creating Scatterplot with Boxplot 
-par(fig=c(0,0.8,0,0.8), new=TRUE) 
+```{r, echo=FALSE, warning=FALSE}
+#Creating Scatterplot with Boxplot
+par(fig=c(0,0.8,0,0.8), new=TRUE)
 plot(stores$sales/1000000, stores$revenue/1000000, xlab="Sales", ylab="Revenue")
-par(fig=c(0,0.8,0.5,1), new=TRUE) 
-boxplot(stores$sales/1000000, horizontal=TRUE, axes=FALSE) 
-par(fig=c(0.65,1,0,0.8),new=TRUE) 
+par(fig=c(0,0.8,0.5,1), new=TRUE)
+boxplot(stores$sales/1000000, horizontal=TRUE, axes=FALSE)
+par(fig=c(0.65,1,0,0.8),new=TRUE)
 boxplot(stores$revenue/1000000, axes=FALSE)
 mtext("Revenue vs. Sales (in millions)", side=3, outer=TRUE, line=-3)
 
 ```
+  
+  
+  
+#### References
+[1] https://www.kaggle.com/headsortails/back-to-predict-the-future-interactive-m5-eda
 
-Correlation between month and # of items sold
-Correlation between items sold and 
-
-1) Hypothesis Test - Saturday and Sunday statistically significant that the rest of     the week
-2) multivariate analysis - sales price and revenue (create the dataframe)
-3) Slopes of increase in sales per each state
-3) descriptive statistics (mean, std deviation, quantiles, correlation matrix, covariance, scatterplot with boxplots for multivariate)
-4) dataframe - sales price and revenue, total sales (add weekday/weekend), sales by state
-5) reference

@@ -98,6 +98,58 @@ get_rev = function(df_tr, df_pr, df_wk){
                           'revenue')]
 }
 
+#CORRELATION BETWEEN NORMAL AND NONNORMAL DATA
+corr.normal = function(vector){
+  X = sort(vector, decreasing = FALSE)
+  n = length(X)
+  prob = (c(1:n)-.5)/n
+  Z = qnorm(prob)
+  
+  return(cor(X,Z))
+}
+
+#wILCOX TEST BETWEEN GROUPS
+paired.wilcox = function(df, p_adjust){
+  #note: Factor first column, values second column
+  #note: Use p_adjust = 1 for adjusting the p-value with bonferroni
+  #change the colnames for easy vector use
+  colnames(df) = c('Factor', 'Value')
+  #get the factors for loop
+  factors = unique(df$Factor)
+  n = length(factors)
+
+  mat = matrix(nrow = 6, ncol = 6)
+  colnames(mat) = factors[1:6]
+  rownames(mat) = factors[2:7]
+  pvalue = c()
+  tracker = c()
+  count = 1
+  for (i in factors){
+    if (count > 1){
+      new_factors = factors[-tracker]
+    }
+    else{
+      new_factors = factors
+    }
+    for (j in new_factors[-1]){
+      X = df[df$Factor == i,]$Value
+      Y = df[df$Factor == j,]$Value
+      mat[j,i] = wilcox.test(X,Y)$p.value
+    }
+    tracker = c(tracker, count)
+    count = count + 1
+  }
+  #adjust p-value if wanted
+  if (p_adjust){
+    mat = matrix(p.adjust(wday.wilcox), nrow = 6, ncol = 6, byrow = FALSE)
+    colnames(mat) = factors[1:6]
+    rownames(mat) = factors[2:7]
+    return(mat)
+  }
+  else{
+    return(mat)
+  }
+}
 ```
 
 ### Import the Data
@@ -309,25 +361,56 @@ $H_{a}: \mu_{wkend} > \mu_{wkday}$
 
 This way we can see if the evidence supports whether there is more shopping on the weekend or not.  
   
-```{r, echo = FALSE}
-qqnorm(total_sales[total_sales$weekday=='Saturday',]$sales)
-qqline(total_sales[total_sales$weekday=='Saturday',]$sales)
-hist(total_sales[total_sales$weekday=='Saturday',]$sales)
-#The sheer numbers in this make the deflected ones very significant
-shapiro.test(total_sales[total_sales$weekday=='Saturday',]$sales)
-```
-
 ```{r, echo=FALSE}
 wday.stats = cbind(tapply(total_sales$sales, total_sales$weekday, mean),
               tapply(total_sales$sales, total_sales$weekday, sd),
-              tapply(total_sales$sales, total_sales$weekday, length)  )
-colnames(wday.stats) = c('Mean', 'Std_Dev', 'Count')
+              tapply(total_sales$sales, total_sales$weekday, length),
+              tapply(total_sales$sales, total_sales$weekday, median))
+colnames(wday.stats) = c('Mean', 'Std_Dev', 'Count', 'Median')
+```
+  
+```{r, echo = FALSE}
+#QQ plot - got a few outliers
+qqnorm(total_sales$sales)
+qqline(total_sales$sales)
+#Can see the outliers really well
+hist(total_sales$sales)
+#Shapiro Test for normality
+shapiro.test(total_sales$sales)
 ```
 
-```{r, echo=FALSE}
-wday.fit = anova(lm(sales ~ as.factor(weekday), data = total_sales))
-wday.fit
+```{r, echo=FALSE}  
+#remove the outliers
+index = which(total_sales$sales < 10000)
+X = total_sales[-index, c('sales', 'weekday')]
+#QQ plot - looks better (normal??)
+qqnorm(X$sales)
+qqline(X$sales)
+#Histogram
+hist(X$sales)
+#Shapiro test for normality - still not normal
+shapiro.test(X$sales)
 ```
+  
+```{r, echo = FALSE}
+#do a correlation test
+wday.normcorr = corr.normal(X$sales)
+```
+  
+```{r, echo = FALSE}
+#Kruskal-Wallis Test for non-normal data
+kruskal.test(X$sales, X$weekday)
+#There is difference between the weekdays
+```
+  
+```{r, echo=FALSE}
+#Do the wilcoxon test between all of the pairs
+#adjusted using bonferroni method
+wday.wilcox = paired.wilcox(total_sales[,c('weekday', 'sales')], p_adjust = TRUE)
+wday.wilcox
+```
+
+#### Start looking at difference between weekday and weekend then move up above weekday comparison.
 
 ```{r, echo=FALSE}
 wkend.fit = anova(lm(sales ~ weekend, data = total_sales))

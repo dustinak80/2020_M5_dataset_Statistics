@@ -403,7 +403,7 @@ plot(CA_weekly$date,CA_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = '
 abline(lm(CA_weekly$sales ~ CA_weekly$date))
 ```
 
-The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier, which may need further investigation.  
+The following two plot shows that CA sales appear to be normally distributed with a fairly equal variance. A more concrete statistical test is needed to verify this result. Index 274 seems to be a bit of an outlier, which may need further investigation.  
 
 ```{r, echo=FALSE}
 plot(CA.lm, which = 2) #Normal Q-Q
@@ -449,7 +449,7 @@ plot(TX_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = '
 abline(lm(TX_weekly$sales ~ TX_weekly$date))
 ```
 
-The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
+The following two plot shows that TX sales appear to be normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
 
 ```{r, echo = FALSE}
 plot(TX.lm,which = 2) #Normal Q-Q
@@ -495,14 +495,32 @@ plot(WI_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = '
 abline(lm(WI_weekly$sales ~ WI_weekly$date))
 ```
 
-The following two plot shows that CA sales are normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
+The following two plot shows that WI sales appear to be normally distributed with a fairly equal variance. Index 274 seems to be a bit of an outlier again, which may need further investigation.   
 
 ```{r, echo = FALSE}
 plot(WI.lm,which = 2) #Normal Q-Q
 plot(WI.lm,which = 1)
 ```
 The next step will be actually doing the Hypothesis test on the difference in the $\beta_{1}$ coefficients for each of these states.  
-  
+
+```{r}
+boxplot(weekly_sales, main = 'Average Weekly Sales by State')
+```
+Our null hypothesis is that the average sales between the three states (CA, TX, WI) are equal.
+
+To decide which test is appropriated, we check normality assumptions and see that the average sales data by state is not normally distributed.
+
+```{r}
+mvn(weekly_sales, multivariatePlot = 'qq')
+```
+
+We use a non-parametric test for testing the group means. 
+```{r}
+kruskal.test(weekly_sales)
+```
+Based on the resutls, we conclude that  at least one State's average sales is significantly different and reject the null hypothesis.
+
+
 ### Comparison of Sales and Revenue by Store
 The next thing we want to look at is how the sales and revenue of the ten stores compares to eachother.
 # ```{r, echo = FALSE}

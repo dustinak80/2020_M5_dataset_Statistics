@@ -681,17 +681,24 @@ plot(WI.lm,which = 1)
 ```
 The next step will be actually doing the Hypothesis test on the difference in the $\beta_{1}$ coefficients for each of these states.  
 
+The null hypothesis is that weekly sales between the 3 states are equal. 
+From the linear regression, we find the 95% confidence interval for weekly sales in California is (21.34, 16.35)
 ```{r}
 confint(CA.lm)
 ```
 
+The 95% confidence interval for weekly sales in Texas is (10.48, 7.49)
 ```{r}
 confint(TX.lm)
 ```
 
+The 95% confidence interval for weekly sales in Wisconsin is (21.20, 17.53)
 ```{r}
 confint(WI.lm)
 ```
+Therefore, we reject the null hypothesis and conclude that at one state's weekly sales is different. In case, we find that weekly sales in Texas differs from the other two states.
+
+
 ### Comparison of Category Sales by State
 The next thing we want to look at is how the sales and revenue of the ten stores compares to eachother.
 # ```{r, echo = FALSE}

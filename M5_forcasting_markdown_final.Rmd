@@ -680,7 +680,18 @@ plot(WI.lm,which = 2) #Normal Q-Q
 plot(WI.lm,which = 1)
 ```
 The next step will be actually doing the Hypothesis test on the difference in the $\beta_{1}$ coefficients for each of these states.  
-  
+
+```{r}
+confint(CA.lm)
+```
+
+```{r}
+confint(TX.lm)
+```
+
+```{r}
+confint(WI.lm)
+```
 ### Comparison of Category Sales by State
 The next thing we want to look at is how the sales and revenue of the ten stores compares to eachother.
 # ```{r, echo = FALSE}

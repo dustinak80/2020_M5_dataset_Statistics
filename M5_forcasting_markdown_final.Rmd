@@ -344,7 +344,33 @@ kable(sales_time_cor, col.names = 'r')
 ```
 
 The two factors that correlate the most with sales are year and wday, and even those are not great. Month and week number in the year have pretty much no correlation.  
-  
+
+### Comparison of Midweek Sales vs. Weekend Sales
+The following is a box plot for midweek and weekend sales. It appears that there are more sales on Saturday and Sunday compared to the 5 other days. 
+```{r}
+week_comparison = total_sales[,c('sales','weekend')]
+week_comparison$day_of_week <- ifelse(week_comparison$weekend == 0 , 'Midweek', 'Weekend')
+
+ggplot(week_comparison, aes(x=as.factor(day_of_week), y=sales, fill = as.factor(day_of_week))) +   geom_boxplot() +
+  theme( legend.position = 'none') +
+  ggtitle('Midweek/Weekend Sales BoxPlot') +
+  xlab('')
+```
+One of our questions of interest was if weekeend sales differed from weekday sales. Leading us to the following hypothesis:
+H0: Mean sales for the weekday = Mean sales for the weekend
+Ha: Mean sales for weekday != Mean sales for the weekend
+
+The p-value is <.05 so we reject the null hypothesis and claim that there is a difference in sales between midweek days and the weekends.
+```{r}
+weekend_sales = total_sales$sales[total_sales$weekend == 1]
+midweek_sales = total_sales$sales[total_sales$weekend == 0]
+kruskal.test(total_sales$sales, total_sales$weekend)
+```
+```{r, echo=FALSE}
+#wkend.fit = anova(lm(sales ~ weekend, data = total_sales))
+#wkend.fit
+```
+
 ### Comparison of Sales and Weekday
 The following plot is a box plot of the days in the week and sales. By looking at this plot, it appears that there are more sales on the weekend than in the rest of the week. It also appears like there is less shopping in the middle of the week then there is in the rest of the week.
 
@@ -410,12 +436,6 @@ wday.wilcox = paired.wilcox(total_sales[,c('weekday', 'sales')], p_adjust = TRUE
 wday.wilcox
 ```
 
-#### Start looking at difference between weekday and weekend then move up above weekday comparison.
-
-```{r, echo=FALSE}
-wkend.fit = anova(lm(sales ~ weekend, data = total_sales))
-wkend.fit
-```
 
 This next chart shows the box plots of the sales through each year in the dataframe.  
 ```{r, echo= FALSE}

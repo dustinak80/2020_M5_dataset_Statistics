@@ -799,24 +799,6 @@ mtext("Revenue vs. Sales (in millions)", side=3, outer=TRUE, line=-3)
 ```  
   
 ```{r, echo = FALSE}
-#install.packages('biotools')
-library('biotools')
-#install.packages('MVN')
-library('MVN')
-
-#Multivariate Normal Test
-mvn(stores_price[,c('sales', 'revenue', 'Food', 'Hobbies', 'Household')], multivariatePlot = 'qq')
-
-#Box M test 
-#boxM( stores_price[,c('Food', 'Hobbies', 'Household')], stores_price[,'state'])
-
-#(3 variables and 3 stores for some states - need to do batlett's test for each one)
-bartlett.test(Food ~ state, data = stores_price)
-bartlett.test(Hobbies ~ state, data = stores_price)
-bartlett.test(Household ~ state, data = stores_price)
-```  
-   
-```{r, echo = FALSE}
 #get all of the states
 state = c()
 for (i in groups){
@@ -833,6 +815,24 @@ fit.category = manova(Y ~ state)
 summary(fit.category)
 
 detach(stores_price)
+```  
+  
+```{r, echo = FALSE}
+#install.packages('biotools')
+library('biotools')
+#install.packages('MVN')
+library('MVN')
+
+#Multivariate Normal Test
+mvn(stores_price[,c('sales', 'revenue', 'Food', 'Hobbies', 'Household')], multivariatePlot = 'qq')
+
+#Box M test 
+#boxM( stores_price[,c('Food', 'Hobbies', 'Household')], stores_price[,'state'])
+
+#(3 variables and 3 stores for some states - need to do batlett's test for each one)
+bartlett.test(Food ~ state, data = stores_price)
+bartlett.test(Hobbies ~ state, data = stores_price)
+bartlett.test(Household ~ state, data = stores_price)
 ```  
   
 ```{r, echo = FALSE}
@@ -880,7 +880,7 @@ pvalue = c(a.food$`Pr(>F)`[1],a.hobbies$`Pr(>F)`[1],a.household$`Pr(>F)`[1])
 #pvalue
 
 #adjust p-values
-p.adjust(pvalue,method = "bon")
+#p.adjust(pvalue,method = "bon")
 padj = cbind(c("Food", 'Hobbies', 'Household'),round(p.adjust(pvalue,method = "bon"), 3))
 colnames(padj) = c('Category', 'Adjust P-Value')
 kable(padj)

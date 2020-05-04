@@ -279,7 +279,7 @@ summary(CA.lm <- lm(CA_weekly$sales ~ CA_weekly$date, data=CA_weekly))
 plot(CA_weekly$date,CA_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'CA Sales', xlab= 'date', ylab = 'sales')
 abline(lm(CA_weekly$sales ~ CA_weekly$date))
 ```
-A QQ plot shows that CA sales are normally distributed.
+A QQ plot shows whether or not CA sales are normally distributed.
 ```{r}
 plot(CA.lm,which = 2) #Normal Q-Q
 ```
@@ -319,7 +319,7 @@ plot(TX_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = '
 abline(lm(TX_weekly$sales ~ TX_weekly$date))
 ```
 
-A QQ plot shows that Texas sales are normally distributed.
+A QQ plot shows whether or not Texas sales are normally distributed.
 ```{r}
 plot(TX.lm,which = 2) #Normal Q-Q
 ```
@@ -356,10 +356,29 @@ summary(WI.lm <- lm(WI_weekly$sales ~ WI_weekly$date, data=WI_weekly))
 plot(WI_weekly$date,TX_weekly$sales, pch = 16, cex = 0.7, col = "blue", main = 'WI Sales', xlab= 'date', ylab = 'sales')
 abline(lm(WI_weekly$sales ~ WI_weekly$date))
 ```
-
+A QQ plot shows whether or not Wisconsin Sales are normally distributed.
 ```{r}
 plot(WI.lm,which = 2) #Normal Q-Q
 ```
+```{r}
+weekly_sales = cbind(CA_weekly[,3], TX_weekly[,3], WI_weekly[,3])
+colnames(weekly_sales)[1] = 'CA Sales'
+colnames(weekly_sales)[2] = 'TX Sales'
+colnames(weekly_sales)[3] = 'WI Sales'
+```
+
+```{r}
+boxplot(weekly_sales, main = 'Average Weekly Sales by State')
+```
+We see that the average sales data by state is not normally distributed.
+```{r}
+mvn(weekly_sales, multivariatePlot = 'qq')
+```
+We use a non-parametric test for testing the group means. Conclude that there at least one State's average sales is significantly different
+```{r}
+kruskal.test(weekly_sales)
+```
+
 
 =======
 ---
